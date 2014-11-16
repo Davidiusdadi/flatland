@@ -1,13 +1,17 @@
 package flatland.gui;
 import java.awt.AWTException;
 import java.awt.Canvas;
+import java.awt.Cursor;
 import java.awt.Graphics;
+import java.awt.Point;
 import java.awt.Robot;
-import java.awt.event.FocusAdapter;
+import java.awt.Toolkit;
+import java.awt.event.FocusListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.image.BufferStrategy;
+import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -18,23 +22,21 @@ import flatland.simulation.UserActor;
 import flatland.simulation.Vision;
 import flatland.simulation.Vision.RayResult;
 
-public class CanvasExplorer extends Canvas implements Runnable {
+public class CanvasExplorer extends Canvas implements Runnable, FocusListener {
 
-	private UserActor actor;
+	private static final long serialVersionUID = 1L;
 
-	public class MouseControl extends MouseAdapter {
+	private class MouseControl extends MouseAdapter {
 
-		private Robot robo;
-
+		private Robot robot;
 		private int mouse_x;
-		private int mouse_y;
-
-		private boolean entered = false;
 		private boolean rest = false;
+		
+		public boolean hasfocus = false;
 
 		public MouseControl() {
 			try {
-				robo = new Robot();
+				robot = new Robot();
 			} catch ( AWTException e ) {
 				throw new RuntimeException( e );
 			}
@@ -42,19 +44,12 @@ public class CanvasExplorer extends Canvas implements Runnable {
 
 		public void mouseEntered( java.awt.event.MouseEvent e ) {
 			mouse_x = e.getX();
-			mouse_y = e.getY();
-			entered = true;
 		}
-
-		public void mouseExited( java.awt.event.MouseEvent e ) {
-			entered = false;
-		}
-
+		
 		public void mouseMoved( java.awt.event.MouseEvent e ) {
-			mouse_y = e.getY();
-
+			if(!hasfocus)
+				return;
 			int center_x = getLocationOnScreen().x + getWidth() / 2;
-			// int center_y = getLocationOnScreen().y + getHeight() / 2;
 
 			int new_x = e.getX();
 
@@ -70,13 +65,13 @@ public class CanvasExplorer extends Canvas implements Runnable {
 
 			if( !showmap ) {
 				rest = true;
-				robo.mouseMove( center_x, e.getYOnScreen() );
+				robot.mouseMove( center_x, e.getYOnScreen() );
 			}
 
 		}
 	}
 
-	public class UserInput extends KeyAdapter {
+	private class UserInput extends KeyAdapter {
 		private Set<Character> pressed = new HashSet<Character>();
 		boolean shift_down = false;
 		boolean control_down = false;
@@ -143,12 +138,10 @@ public class CanvasExplorer extends Canvas implements Runnable {
 		}
 
 		public void procees() {
-			// System.out.println(pressed);
 			double ang;
 			double speed = shift_down ? pos_speed * 4 : pos_speed;
 			speed = control_down ? pos_speed / 4 : speed;
 
-			// System.out.println( pos_speed );W
 			for( char c : pressed ) {
 				switch ( c ) {
 					case 'q':
@@ -179,6 +172,8 @@ public class CanvasExplorer extends Canvas implements Runnable {
 		}
 	}
 
+	private UserActor actor;
+
 	private double pos_speed;
 
 	private boolean showmap = false;
@@ -186,6 +181,7 @@ public class CanvasExplorer extends Canvas implements Runnable {
 	private UserInput userinput;
 	private Thread ownThread;
 	private MouseControl mouseinput;
+	private Cursor cursor_blank;
 
 	private Map map;
 	private Vision vision;
@@ -206,18 +202,10 @@ public class CanvasExplorer extends Canvas implements Runnable {
 		addKeyListener( userinput );
 		addMouseMotionListener( mouseinput );
 
-		addFocusListener( new FocusAdapter() {
-			public void focusGained( java.awt.event.FocusEvent e ) {
-				System.out.println( e );
-			};
+		addFocusListener( this );
 
-			public void focusLost( java.awt.event.FocusEvent e ) {
-				System.out.println( e );
-			};
-		} );
-		setFocusable( true );
-		requestFocus();
-		requestFocusInWindow();
+		BufferedImage cursorImg = new BufferedImage( 16, 16, BufferedImage.TYPE_INT_ARGB );
+		cursor_blank = Toolkit.getDefaultToolkit().createCustomCursor( cursorImg, new Point( 0, 0 ), "blank cursor" );
 
 	}
 
@@ -299,6 +287,16 @@ public class CanvasExplorer extends Canvas implements Runnable {
 			g.setColor( r.color_distance() );
 			g.fillRect( i * step, 15 + height, step, height );
 		}
+	}
+
+	public void focusGained( java.awt.event.FocusEvent e ) {
+		setCursor( cursor_blank );
+		mouseinput.hasfocus = true;
+	}
+
+	public void focusLost( java.awt.event.FocusEvent e ) {
+		setCursor( Cursor.getDefaultCursor() );
+		mouseinput.hasfocus = false;
 	}
 
 }
